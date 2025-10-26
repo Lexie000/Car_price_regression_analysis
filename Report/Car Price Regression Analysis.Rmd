@@ -1,5 +1,5 @@
 ---
-title: "c67 fianl report_Model"
+title: "Car Price Regression Analysis"
 author: "Jinminli-1008264361"
 date: "2024-12-03"
 output:
