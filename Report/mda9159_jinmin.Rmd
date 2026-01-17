@@ -1,0 +1,932 @@
+---
+title: "mda9159_final_project"
+author: "Jinminli-100826436"
+date: "2025-12-08"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(knitr)
+library(stringr)
+library(purrr)
+library(rlang)
+library(ggplot2)
+library(gridExtra)
+
+car <- read.csv("serbia_car_sales_price_2024.csv") #load dataset
+# change horsepower into numeric values (unit: HP)
+car$horsepower <- as.numeric(gsub(" HP.*", "", car$horsepower))
+```
+
+# EDA for Raw Data
+
+```{r distribution of num}
+num_vars_0 <- c("price", "views", "favorite", "year",
+  "seats_amount", "horsepower",
+  "car_mileage..km", "engine_capacity..cc"
+)
+
+num_summary <- data.frame(
+  variable = num_vars_0,
+  n       = sapply(car[num_vars_0], function(x) sum(!is.na(x))),
+  mean    = sapply(car[num_vars_0], function(x) mean(x, na.rm = TRUE)),
+  sd      = sapply(car[num_vars_0], function(x) sd(x, na.rm = TRUE)),
+  median  = sapply(car[num_vars_0], function(x) median(x, na.rm = TRUE)),
+  min     = sapply(car[num_vars_0], function(x) min(x, na.rm = TRUE)),
+  max     = sapply(car[num_vars_0], function(x) max(x, na.rm = TRUE))
+)
+
+knitr::kable(
+  num_summary,
+  digits  = 1,
+  caption = "Summary statistics for numeric variables in the raw data"
+)
+
+```
+
+```{r Distribution of cat}
+cat_table <- function(x, var_name) {
+  tab <- table(x, useNA = "ifany")
+  out <- data.frame(
+    level   = names(tab),
+    count   = as.vector(tab),
+    percent = round(100 * tab / sum(tab), 1)
+  )
+  knitr::kable(
+    out,
+    caption = paste0("Distribution of ", var_name)
+  )
+}
+
+cat_table(car$fuel,          "fuel")
+cat_table(car$car_type,      "car_type")
+cat_table(car$type_of_drive, "type_of_drive")
+cat_table(car$gearbox,       "gearbox")
+cat_table(car$doors,         "doors")
+cat_table(car$A.C,           "A.C")
+cat_table(car$emission_class,"emission_class")
+
+```
+
+## Response
+
+```{r Response Variable Plots}
+# Boxplot
+p_price_box <- ggplot(car, aes(y = price)) +
+  geom_boxplot() +
+  labs(
+    title = "Boxplot of Car Price",
+    y = "Price (EUR)"
+  )
+p_price_box           
+ggsave("mda9159_jinmin_files/price_boxplot.png", p_price_box, width = 6, height = 4)
+
+# Histogram
+p_price_hist <- ggplot(car, aes(x = price)) +
+  geom_histogram(bins = 50) +
+  labs(
+    title = "Histogram of Car Price",
+    x = "Price (EUR)",
+    y = "Count"
+  )
+p_price_hist
+ggsave("mda9159_jinmin_files/price_histogram.png", p_price_hist, width = 6, height = 4)
+
+```
+
+## Numerical
+
+```{r Numerical Variable Boxplots}
+num_vars <- c(
+  "views",
+  "favorite",
+  "year",
+  "seats_amount",
+  "horsepower",
+  "car_mileage..km",
+  "engine_capacity..cc"
+)
+
+
+par(mfrow = c(2, 4))
+for (v in num_vars) {
+  boxplot(car[[v]],
+          main = v,
+          ylab = "")
+}
+par(mfrow = c(1, 1))
+```
+
+
+```{r save numeric_boxplots.png}
+png("mda9159_jinmin_files/numeric_boxplots.png", width = 1200, height = 800)
+par(mfrow = c(2, 4))
+for (v in num_vars) {
+  boxplot(car[[v]],
+          main = v,
+          ylab = "")
+}
+par(mfrow = c(1, 1))
+dev.off()
+```
+
+
+```{r, warning=FALSE}
+library(GGally)
+ggpairs(car[num_vars])
+
+```
+
+```{r corplot}
+library(corrplot)
+
+#compute correlation matrix
+cor_matrix <- cor(car[,num_vars], use = "complete.obs", method = "pearson")
+
+#create correlation matrix plot
+corrplot(cor_matrix, method = "number", type = "lower",
+         diag = FALSE,  tl.col="black", tl.srt=45)
+```
+
+```{r}
+png("mda9159_jinmin_files/correlation_matrix.png", width = 900, height = 900)
+
+corrplot(
+  cor_matrix,
+  method = "number",
+  type = "lower",
+  diag = FALSE,
+  tl.col = "black",
+  tl.srt = 45
+)
+
+dev.off()
+
+```
+
+
+
+## Categorical
+
+```{r Categorical Variable Boxplots}
+cat_vars <- c("fuel", "car_type", "type_of_drive",
+              "gearbox", "doors", "A.C")
+
+
+par(mfrow = c(3, 2), mar = c(5, 4, 3, 1)) 
+
+for (v in cat_vars) {
+  x  <- car[[v]]
+  ok <- x != "" & !is.na(x) & !is.na(car$price)  
+
+  boxplot(car$price[ok] ~ x[ok],
+          main = paste("Price by", v),
+          xlab = v,
+          ylab = "Price",
+          cex.axis = 0.7)  
+}
+
+par(mfrow = c(1, 1)) 
+```
+
+```{r save categorical_price_boxplots.png}
+png("mda9159_jinmin_files/categorical_price_boxplots.png", width = 1200, height = 800)
+par(mfrow = c(2, 3), mar = c(5, 4, 3, 1)) 
+for (v in cat_vars) {
+  x  <- car[[v]]
+  ok <- x != "" & !is.na(x) & !is.na(car$price)
+  boxplot(car$price[ok] ~ x[ok],
+          main = paste("Price by", v),
+          xlab = v,
+          ylab = "Price",
+          cex.axis = 0.7)
+}
+par(mfrow = c(1, 1))
+dev.off()
+```
+
+# Data Cleaning
+
+```{r car brand}
+car_data_cleaned <- car
+# car name->car brand
+car_data_cleaned$car_brand <- sub(" .*", "", car$car_name)
+car_data_cleaned$car_name <- NULL
+```
+
+
+```{r remove outliers for y}
+remove_outliers <- function(data, column) {
+  Q1 <- quantile(data[[column]], 0.1, na.rm = TRUE)
+  Q3 <- quantile(data[[column]], 0.9, na.rm = TRUE)
+  IQR <- Q3 - Q1
+  lower_bound <- Q1 - 1.5 * IQR
+  upper_bound <- Q3 + 1.5 * IQR
+  data %>% filter(data[[column]] >= lower_bound & data[[column]] <= upper_bound)
+}
+
+car_data_cleaned <- remove_outliers(car_data_cleaned, "price")
+
+# clean the dataset for the first time
+car_data_cleaned= car_data_cleaned %>% filter(car_mileage..km < 5*10^5, favorite < 50,
+                              horsepower < 400, year >= 1970)
+```
+
+```{r Categorical variables}
+
+# car type
+car_data_cleaned <- car_data_cleaned %>%
+  mutate(
+    car_type = case_when( 
+      car_type %in% c("limousine") ~ "Limousine",
+      car_type %in% c("minivan (MPV)", "caravan") ~ "Family",
+      car_type %in% c("pickup") ~ "Pickup",
+      car_type %in% c("hatchback", "coupe") ~ "Economy",
+      car_type %in% c("cabriolet") ~ "Sport",
+      car_type %in% c("suv") ~ "SUV",
+      TRUE ~ "Other"
+    )
+  )
+
+car_data_cleaned <- car_data_cleaned[car_data_cleaned$emission_class != "", ]
+
+# emission class
+car_data_cleaned <- car_data_cleaned %>%
+  mutate(
+    emission_type = case_when(
+      emission_class %in% c("Euro 6") ~ "Large Displacement",
+      emission_class %in% c("Euro 1","Euro 2","Euro 3","Euro 4","Euro 5") ~ "Small Displacement"
+    )
+  )
+car_data_cleaned$emission_class <- NULL
+
+# door number
+car_data_cleaned$is_2_3_doors <- ifelse(car_data_cleaned$doors == "2/3 doors", TRUE, FALSE)
+car_data_cleaned$doors <- NULL
+
+# Fuel
+car_data_cleaned <- car_data_cleaned %>%
+  mutate(
+    fuel_type = case_when(
+      fuel %in% c("petrol", "diesel", "Diesel + gas", "petrol + gas", "gas") ~ "Oil", 
+      fuel %in% c("electric") ~ "Electric", 
+      fuel %in% c("hybrid", "methane", "cng", "lpg") ~ "Mixture", 
+      TRUE ~ "Unknown"  
+    )
+    )
+  
+car_data_cleaned$fuel <- NULL
+
+# brand
+car_data_cleaned <- car_data_cleaned %>%
+  mutate(
+    car_brand_category = case_when(
+      car_brand %in% c("Audi", "BMW", "Mercedes", "Lexus", "Porsche", "Jaguar", "Land Rover", "Volvo") ~ "Luxury",
+      car_brand %in% c("Ford", "Honda", "Hyundai", "Mazda", "Nissan", "Toyota", "Volkswagen", "Skoda", "Mini", 
+                       "Opel", "Mitsubishi", "Chevrolet", "Kia", "Subaru", "Seat") ~ "Standard",
+      car_brand %in% c("Fiat", "Dacia", "Suzuki", "Citroen", "Peugeot", "Renault", "Daewoo", "Daihatsu", 
+                       "Lada", "Zastava") ~ "Budget",
+      car_brand %in% c("Jeep", "Alfa","Dodge", "Chrysler", "Rover", "MG", "Isuzu", "Iveco", "SsangYong", "Smart", 
+                       "Saab", "UAZ") ~ "Other",
+      TRUE ~ "Unknown"
+    )
+  )
+car_data_cleaned$car_brand <- NULL
+
+# gearbox_group
+car_data_cleaned <- car_data_cleaned %>%
+  mutate(
+    gearbox_group = case_when(
+      grepl("automatic", gearbox) ~ "automatic",
+      grepl("manual",    gearbox) ~ "manual",
+      TRUE ~ "other"
+    )
+  )
+car_data_cleaned$gearbox <- NULL
+
+
+```
+
+### filter dataset
+
+```{r}
+# clean the dataset for the second time
+car_data_cleaned <- car_data_cleaned %>%
+  filter(
+    car_mileage..km < 5*10^5,
+    favorite       < 30, 
+    horsepower     < 300,
+    year           >= 2000,
+    car_brand_category != "Unknown"
+  )
+
+
+```
+
+### post days
+
+```{r}
+# post days
+car_data_cleaned <- car_data_cleaned |>
+  mutate(
+    post_days = case_when(
+      # Today = 0
+      str_detect(post_info, "today") ~ 0,
+
+      # Yesterday = 1 day ago
+      str_detect(post_info, "yesterday") ~ 1,
+      # a week = 7
+      str_detect(post_info, "a week") ~ 7,
+      # x weeks = 7x
+      str_detect(post_info, "weeks") ~ as.numeric(str_extract(post_info, "\\d+")) * 7,
+      # month appx= 30
+      str_detect(post_info, "month") ~ 30,
+      # x days = x
+      str_detect(post_info, "days") ~ as.numeric(str_extract(post_info, "\\d+")),
+      TRUE ~ NA_real_
+    )
+  )
+
+# check null value
+# sum(is.na(car_data_cleaned$post_days))
+# drop post info
+car_data_cleaned$post_info <- NULL
+```
+
+
+
+```{r Check Null Value}
+colSums(is.na(car_data_cleaned))
+head(car_data_cleaned)
+```
+
+# Exploratory Data Analysis
+###  Summary statistics & tables
+```{r num_vars stat}
+
+
+num_summary <- data.frame(
+  variable = num_vars,
+  mean   = sapply(car_data_cleaned[num_vars], mean,   na.rm = TRUE),
+  sd     = sapply(car_data_cleaned[num_vars], sd,     na.rm = TRUE),
+  median = sapply(car_data_cleaned[num_vars], median, na.rm = TRUE),
+  min    = sapply(car_data_cleaned[num_vars], min,    na.rm = TRUE),
+  max    = sapply(car_data_cleaned[num_vars], max,    na.rm = TRUE)
+)
+
+knitr::kable(
+  num_summary,
+  digits  = 2,
+  caption = "Summary statistics for numeric variables"
+)
+
+```
+```{r}
+par(mfrow = c(2, 4))
+for (v in num_vars) {
+  plot(car_data_cleaned[[v]], car_data_cleaned$price,
+       xlab = v,
+       ylab = "price",
+       main = paste("Price vs", v),
+       pch = 16, cex = 0.5, col = rgb(0,0,0,0.4))
+
+  abline(lm(price ~ car_data_cleaned[[v]], data = car_data_cleaned),
+         col = "red", lwd = 2)
+}
+par(mfrow = c(1, 1))
+
+```
+
+```{r}
+png("mda9159_jinmin_files/scatterplots_price.png", width = 1200, height = 800)
+par(mfrow = c(2, 4))
+for (v in num_vars) {
+  plot(car[[v]], car$price,
+       xlab = v,
+       ylab = "price",
+       main = paste("Price vs", v),
+       pch = 16, cex = 0.5, col = rgb(0,0,0,0.4))
+  abline(lm(price ~ car[[v]], data = car), col = "red", lwd = 2)
+}
+par(mfrow = c(1, 1))
+dev.off()
+
+```
+
+```{r cat_vars stat}
+cat_vars <- c(
+  "A.C", "type_of_drive",
+  "gearbox_group", "car_brand_category", "car_type",
+  "emission_type", "fuel_type"
+)
+
+cat_summary <- purrr::map_dfr(cat_vars, function(v) {
+  car_data_cleaned %>%
+    dplyr::filter(!is.na(.data[[v]]), .data[[v]] != "") %>%
+    dplyr::count(level = .data[[v]]) %>%
+    dplyr::mutate(
+      variable = v,
+      percent  = 100 * n / sum(n)
+    ) %>%
+    dplyr::relocate(variable)
+})
+
+knitr::kable(
+  cat_summary,
+  digits  = 1,
+  caption = "Frequency and percentage for categorical variables"
+)
+```
+```{r dummy}
+# dummy
+tibble(
+  is_2_3_doors_count = sum(car_data_cleaned$is_2_3_doors, na.rm = TRUE)
+)
+```
+
+
+
+
+## Summary of Variables in `car_data_cleaned`
+### **1. Numeric Variables**
+- **views**: Number of times the listing was viewed.  
+- **favorite**: Number of users who added the car to their favorites.  
+- **price**: Listing price (in euros).  
+- **year**: Vehicle manufacturing year.  
+- **seats_amount**: Number of seats in the vehicle.  
+- **horsepower**: Engine horsepower output.  
+- **car_mileage..km**: Total mileage of the car in kilometers.  
+- **engine_capacity..cc**: Engine displacement, measured in cubic centimeters (cc).  
+- **post_days**: Number of days the listing has been posted online.
+
+### **2. Categorical Variables**
+- **A.C**: Type of air conditioning system (e.g., manual A/C, automatic A/C).  
+- **color**: Exterior color of the vehicle.  
+- **type_of_drive**: Drivetrain type (front-wheel, rear-wheel, all-wheel drive).  
+- **car_type**: Vehicle class (e.g., Economy, Limousine).  
+- **emission_type**: Emission classification based on engine design.  
+- **fuel_type**: Type of fuel used by the vehicle (e.g., gasoline, diesel, oil).  
+- **car_brand_category**: Grouped brand category assigned to each car.  
+- **gearbox_group**: Gearbox type (manual vs. automatic).
+
+These variables help differentiate vehicles by design, environmental category, mechanical structure, and brand classification.
+### **3. Binary / Logical Variable**
+
+- **is_2_3_doors**: Logical indicator identifying whether the vehicle has 2 or 3 doors.
+# Model
+```{r}
+car_model <- car_data_cleaned %>%
+  dplyr::select(
+    price,  # response
+    views, favorite, year, seats_amount,
+    horsepower, car_mileage..km, engine_capacity..cc, post_days,  # numerical
+    A.C, type_of_drive,
+    car_type, emission_type, fuel_type, car_brand_category, gearbox_group,  # categorical
+    is_2_3_doors  # dummy
+  ) %>%
+  na.omit()
+
+car_model <- car_model %>%
+  mutate(
+    A.C                = factor(A.C),
+    type_of_drive      = factor(type_of_drive),
+    car_type           = factor(car_type),
+    emission_type      = factor(emission_type),
+    fuel_type          = factor(fuel_type),
+    car_brand_category = factor(car_brand_category),
+    gearbox_group      = factor(gearbox_group)
+  )
+
+```
+
+## Baseline model
+```{r full model}
+# Create log_price
+car_model <- car_model %>%
+  mutate(log_price = log(price))
+
+# Full linear model (corrected)
+full_model <- lm(
+  log_price ~ 
+    views + favorite + year + seats_amount +
+    horsepower + car_mileage..km + engine_capacity..cc + post_days +
+    A.C + type_of_drive + 
+    car_type + emission_type + fuel_type +
+    car_brand_category + gearbox_group +
+    is_2_3_doors,   # replacement for doors_num
+  data = car_model
+)
+
+summary(full_model)
+
+```
+```{r}
+library(car)
+vif_values <- vif(full_model)
+
+print(vif_values)
+```
+
+
+
+From the full model, we observed that several variables: **views**, 
+**seats_amount**, **engine_capacity..cc**, **post_days**, **emission_type**,
+**fuel_type**, **car_type (Limousine)**, and **car_brand_category (Other)**  
+make only marginal contributions to explaining or predicting the log-transformed
+price. These predictors show weak statistical significance or minimal effect 
+sizes, so it is reasonable to remove them when constructing the reduced model.
+
+```{r reduced_model_1}
+reduced_model <- lm(
+  log_price ~
+    favorite + year + horsepower + car_mileage..km +
+     post_days +
+    is_2_3_doors +
+    A.C + type_of_drive + car_type +
+    car_brand_category + gearbox_group,
+  data = car_model
+)
+
+summary(reduced_model)
+
+```
+```{r reduced_2}
+reduced_model_2<- lm(
+  log_price ~ favorite + year + horsepower + car_mileage..km +
+    is_2_3_doors +
+    A.C + type_of_drive + car_type + 
+    car_brand_category + gearbox_group,
+  data = car_model
+)
+summary(reduced_model_2)
+
+```
+
+
+```{r reduced_model diagnostic}
+par(mfrow = c(2, 2)) # Set up a 2x2 plotting layout
+plot(reduced_model) # Automatically generates the 4 diagnostic plots
+```
+
+- Residuals are mostly centered around zero with no strong non-linear pattern in the Residuals vs Fitted plot.
+
+- The Q–Q plot shows heavier-than-normal tails and a few extreme outliers.
+
+- The Scale–Location plot indicates mild heteroskedasticity, with slightly greater residual spread for certain fitted values.
+
+- A small number of points exhibit relatively high leverage and large residuals.
+
+**These issues are not severe given the large sample size, but they suggest prediction errors may increase for atypical vehicles.**
+
+```{r residual}
+r_std <- rstandard(reduced_model)
+which(abs(r_std) > 3)  
+```
+A few listings had extremely high mileage combined with very low prices (e.g., above 200,000 km but below 500 EUR), which generated large negative standardized residuals and strongly influenced the tails of the residual distribution. We treated these as atypical outliers representing severely damaged or non-standard vehicles and removed them using the rule “mileage > 200,000 km and price < 500 EUR”. Re-estimating the model on the cleaned sample yielded very similar coefficients and R^2, but slightly improved residual diagnostics.
+
+```{r data clean_2}
+car_model2 <- car_model %>%
+  filter(!(car_mileage..km > 200000 & price < 2000))
+
+```
+
+**Best Baseline Model**
+ 
+```{r reduced_model_3}
+reduced_model_3 <- lm(
+  log_price ~ favorite + year + horsepower + car_mileage..km +
+    post_days + is_2_3_doors +
+    A.C + type_of_drive + car_type +
+    car_brand_category + gearbox_group,
+  data = car_model2
+)
+
+summary(reduced_model_3)
+```
+```{r}
+par(mfrow = c(2, 2))
+plot(reduced_model_3)
+par(mfrow = c(1, 1))
+```
+
+
+```{r Robust standard errors for best reduced_model3}
+library(sandwich)
+library(lmtest)
+
+coeftest(reduced_model_3, vcov = vcovHC(reduced_model_3, type = "HC1"))
+```
+##WLS
+```{r wls}
+ols_fit <- reduced_model_3
+w <- 1 / fitted(ols_fit)^2
+
+wls_model <- lm(log_price ~ favorite + year + horsepower + car_mileage..km +
+    post_days + is_2_3_doors +
+    A.C + type_of_drive + car_type +
+    car_brand_category + gearbox_group, data = car_model2, weights = w)
+summary(wls_model)
+
+```
+- **Coefficient direction is identical:**  
+  Key effects such as `year`, `horsepower`, `SUV`, `luxury brand`, and `automatic gearbox` remain almost unchanged.
+
+- **Significance pattern is also unchanged:**  
+  `year`, `horsepower`, `A.C`, drivetrain, body type, brand category, and `gearbox_group` stay strongly significant.  
+  `post_days` remains clearly non-significant, confirming it adds little explanatory power.
+
+- **Model fit is nearly the same:**  
+  Adjusted R2 indicating almost no difference in overall performance.
+
+
+## Poly
+```{r poly}
+car_model2 <- car_model2 %>%
+  mutate(
+    log_mileage = log1p(car_mileage..km),
+    hp_c  = horsepower - mean(horsepower, na.rm = TRUE),
+    hp_c2 = hp_c^2
+  )
+
+poly_model <- lm(
+  log_price ~ favorite + year + hp_c + hp_c2 + log_mileage +
+    is_2_3_doors +
+    A.C + type_of_drive + car_type +
+    car_brand_category + gearbox_group,
+  data = car_model2
+)
+
+summary(poly_model)
+
+```
+
+
+## Interaction model
+
+From the car price data, we suspected that factors such as mileage, horsepower, and seating capacity may interact in a way that the combined effect on price is not simple. We noted that these continuous variables can interact with other predictors, such as the age or the number of seats, in order to improve the predictive power of our model.
+
+-   car_mileage..km \* year : High mileage decreases the price of newer cars more significantly than older ones. When a newer car has high mileage, it indicates that it has been driven extensively in a short period, which may treat as a red flag for buyers.
+
+-   horsepower_numeric \* year :Technological improvements in rencent years allow newer cars to have higher horsepower without drawbacks, altering its price impact.
+
+```{r Interaction model}
+interaction_model_1 <- lm(
+  log_price ~ favorite + year + horsepower + car_mileage..km +
+    is_2_3_doors +
+    A.C + type_of_drive + car_type +
+    car_brand_category + gearbox_group +
+    year:car_mileage..km + year:horsepower,
+  data = car_model2
+)
+
+summary(interaction_model_1)
+
+```
+
+-   Backward stepwise selection systematically removes variables included that 
+contribute minimally towards explanatory power using as criteria the AIC.
+
+```{r echo=FALSE}
+# Backward stepwise using AIC
+interaction_model <- step(interaction_model_1,
+                          direction = "backward",
+                          trace = 0)
+
+summary(interaction_model)
+
+```
+
+
+# Model selection
+
+```{r}
+# Store models in a named list
+models <- list(
+  baseline    = reduced_model_3,
+  poly        = poly_model,
+  interaction = interaction_model
+)
+
+# Loop through and print VIF for each model
+for (m in names(models)) {
+  cat("\n---- VIF for", m, "model ----\n")
+  print(vif(models[[m]]))
+}
+
+```
+
+
+```{r aic}
+lapply(models, AIC)
+```
+
+```{r bic}
+lapply(models, BIC)
+```
+
+```{r}
+coef_table <- broom::tidy(poly_model)
+
+coef_table |>
+  dplyr::mutate(
+    term = gsub("is_2_3_doorsTRUE", "2/3 doors (vs 4/5)", term),
+    term = gsub("gearbox_groupmanual", "Manual gearbox (vs automatic)", term)
+  ) |>
+  gt::gt() |>
+  gt::fmt_number(
+    columns = c(estimate, std.error, statistic, p.value),
+    decimals = 3
+  )
+
+```
+### SO WE CHOSE POLYNOMIAL MODEL AS FINAL MODEL!!
+```{r}
+final_model <- poly_model
+final_formula <- log_price ~ favorite + year + hp_c + hp_c2 + log_mileage + 
+    is_2_3_doors + A.C + type_of_drive + car_type + car_brand_category + 
+    gearbox_group
+```
+
+```{r}
+set.seed(11)
+k <- 30
+
+data_cv <- car_model2[complete.cases(model.matrix(final_formula, data = car_model2)), ]
+data_cv <- data_cv[sample(1:nrow(data_cv)), ] 
+
+folds <- cut(seq_len(nrow(data_cv)), breaks = k, labels = FALSE)
+
+mse_train <- numeric(k)
+mse_valid <- numeric(k)
+
+for (i in 1:k) {
+valid_idx  <- which(folds == i)
+valid_data <- data_cv[ valid_idx, ]
+train_data <- data_cv[-valid_idx, ]
+
+fit_i <- lm(final_formula, data = train_data)
+
+y_train <- model.response(model.frame(final_formula, data = train_data))
+y_valid <- model.response(model.frame(final_formula, data = valid_data))
+
+pred_train <- predict(fit_i, newdata = train_data)
+pred_valid <- predict(fit_i, newdata = valid_data)
+
+mse_train[i] <- mean((y_train - pred_train)^2)
+mse_valid[i] <- mean((y_valid - pred_valid)^2)
+}
+
+cv_results <- data.frame(
+Metric = c("Average MSE (training)", "Average MSE (validation)"),
+Value  = c(mean(mse_train), mean(mse_valid))
+)
+
+knitr::kable(cv_results, digits = 4,
+caption = "30-fold cross-validation results for the final model")
+
+
+par(mfrow = c(1, 2))
+plot(pred_train, y_train - pred_train,
+main = "Training residuals",
+xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, col = "red")
+
+plot(pred_valid, y_valid - pred_valid,
+main = "Validation residuals",
+xlab = "Fitted values", ylab = "Residuals")
+
+```
+
+## PI and CI
+```{r pi&ci}
+
+final_fit <- lm(final_formula, data = car_model2)
+
+set.seed(123)
+new_data <- car_model2[sample(1:nrow(car_model2), 5), ]
+
+#CI & PI at log scale
+
+ci_log <- predict(final_fit, newdata = new_data, interval = "confidence")
+pi_log <- predict(final_fit, newdata = new_data, interval = "prediction")
+# back to price scale
+
+results_pi_ci <- data.frame(
+actual_price = new_data$price,
+fitted_price = exp(ci_log[,"fit"]),
+CI_lower     = exp(ci_log[,"lwr"]),
+CI_upper     = exp(ci_log[,"upr"]),
+PI_lower     = exp(pi_log[,"lwr"]),
+PI_upper     = exp(pi_log[,"upr"])
+)
+
+knitr::kable(results_pi_ci, digits = 1,
+caption = "Confidence and prediction intervals for selected cars (price scale)")
+
+```
+
+## trimmed final model
+```{r}
+rstd <- rstandard(poly_model)
+car_model3 <- car_model2[abs(rstd) <= 3.5, ]
+
+poly_model_trimmed <- lm(
+  log_price ~ favorite + year + hp_c + hp_c2 + log_mileage +
+    is_2_3_doors + A.C + type_of_drive + car_type +
+    car_brand_category + gearbox_group,
+  data = car_model3
+)
+
+summary(poly_model_trimmed)
+
+
+```
+# Model Diagnostics
+
+## Residual plots
+
+We first evaluated the OLS baseline model and our final polynomial model using 
+the four standard diagnostic plots (Residuals vs Fitted, Normal Q–Q, 
+Scale–Location and Residuals vs Leverage). For the polynomial specification,
+the Residuals vs Fitted plot shows a roughly symmetric cloud of points around 
+zero, with no strong curvature, suggesting that the log transformation of price,
+the log transformation of mileage and the quadratic term in horsepower capture
+most of the non-linear patterns. The Q–Q plot still exhibits noticeable 
+deviations in the extreme tails: very cheap and very expensive cars are harder 
+to predict, and residuals for those listings are larger in magnitude. The 
+Scale–Location plot indicates mild heteroskedasticity, with slightly smaller 
+residual variance at higher fitted values.
+
+```{r Residual plots}
+par(mfrow = c(2, 2))
+plot(poly_model)
+par(mfrow = c(1, 1))
+
+```
+## Outlier
+
+We examined standardized residuals and influence measures to identify unusual 
+listings. A small number of observations have |standardized residuals| above 
+about 3.5 and appear at the ends of the Q–Q plot; these correspond to extreme 
+combinations such as very high mileage with very low price. We also inspected 
+leverage and Cook’s distance in the Residuals vs Leverage plot and found only a
+handful of points with both high leverage and large residuals. As a robustness 
+check, we trimmed observations with |standardized residual| > 3.5 and refitted 
+the polynomial model (poly_model_trimmed). The diagnostic plots become slightly 
+tighter, but the estimated coefficients and their significance are very similar 
+to the untrimmed model, indicating that our conclusions are not driven by a few 
+extreme listings.
+
+```{r Outlier}
+rstd <- rstandard(poly_model)
+table(abs(rstd) > 3.5)   # number of extreme residuals
+
+par(mfrow = c(2, 2))
+plot(poly_model_trimmed) # trimmed robustness model
+par(mfrow = c(1, 1))
+
+```
+
+## Linearity
+
+Scatterplots of price against the main continuous predictors showed strong 
+non-linear patterns: mileage is highly right-skewed and its marginal effect on 
+price becomes flatter at high values, while horsepower has a curved relationship
+with price. To address this, we modelled log(price) as the response, used 
+log_mileage instead of raw mileage, and added a quadratic term in centred 
+horsepower (hp_c2). After these transformations, the Residuals vs Fitted plot 
+no longer shows pronounced curvature, suggesting that the linearity assumption 
+is reasonable on the transformed scale. However, the Scale–Location plot still 
+indicates mild heteroskedasticity. Therefore we additionally estimated a 
+weighted least squares (WLS) version of the polynomial model. The WLS fit 
+reduces the spread of residuals for high fitted values, but the main 
+coefficient estimates and their t-statistics remain very close to the OLS 
+results, which supports the robustness of our findings.
+
+```{r  WLS diagnostics}
+par(mfrow = c(2, 2))
+plot(wls_model)       
+par(mfrow = c(1, 1))
+
+```
+
+## Overall
+
+Overall, the final polynomial model with log(price) as the response, 
+log mileage, a quadratic horsepower term and grouped categorical predictors 
+achieves an adjusted R2 of about 0.76 and captures the main economic 
+relationships in the data: newer, more powerful, low-mileage cars from 
+premium brands command higher prices. The diagnostic checks show that the 
+linearity assumption is broadly satisfied after transformation, and that 
+heteroskedasticity and non-normality are present mainly in the extreme tails 
+but not severe. Outlier trimming and WLS robustness checks lead to very 
+similar coefficient estimates. We therefore conclude that the model is adequate 
+for explaining and predicting used-car prices in this dataset, while 
+acknowledging that prediction error is larger for the most unusual listings.
+
+
