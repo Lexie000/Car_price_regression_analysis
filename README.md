@@ -57,9 +57,16 @@ A concise, reproducible project to **model and explain used-car prices**. We exp
   
   Replace this section with your actual metrics table (RMSE/MAE/R²) and 1–2 plots exported to Report/.
 
+## Work Separation
+| Contributor | Responsibilities |
+|-------------|------------------|
+| **Jinmin Li** | RMarkdown, Code implementation, Logic & Methodology |
+| **Sam Guan** | Report writing, Documentation |
+| **Zongyu Li** | Report writing, Documentation |
+
 ## How to cite
 
 If you use this repo:
 ```
-Jinmin Li. Sicheng Huang. Zixiang Xiao. Yifan Wang (2024). Car Price Regression Analysis. Repository: https://github.com/Lexie000/Car_price_regression_analysis
+Jinmin Li. Sam Guan, Zongyu Li(2025). Car Price Regression Analysis. Repository: https://github.com/Lexie000/Car_price_regression_analysis
 ```
